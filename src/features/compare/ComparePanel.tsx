@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useServices } from '@/app/ServicesProvider';
 import type { Comparison } from '@/application/ComparisonService';
 import type { SegmentResult, TimeRange } from '@/domain/comparison/compareTakes';
-import { describeKeyOffset, describeSegment } from '@/domain/comparison/feedback';
+import { describeKeyOffset, describeSegment, scoreBand } from '@/domain/comparison/feedback';
 import { readyForFullTake, sectionProgress } from '@/domain/practice/practiceProgress';
 import type { RecordingId } from '@/domain/recording/Recording';
 import type { Reference } from '@/domain/reference/Reference';
@@ -19,8 +19,6 @@ const CONTEXT_SEC = 0.3;
 
 interface Props {
   recordingId: RecordingId;
-  /** Older takes, newest first; the latest one compared with the same reference is the "before". */
-  olderRecordingIds: RecordingId[];
   references: Reference[];
   takeAudioRef: RefObject<HTMLAudioElement>;
   durationSec: number;
@@ -78,15 +76,14 @@ type Listen = 'reference' | 'mine' | 'both';
 function ComparisonView({
   reference,
   recordingId,
-  olderRecordingIds,
   takeAudioRef,
   durationSec,
   currentTimeSec,
   onSeek,
   comparison,
 }: ViewProps & { comparison: Comparison }) {
-  const { config, comparisons, practice: practiceService } = useServices();
-  const { report, takeTrack, referenceTrack } = comparison;
+  const { config, practice: practiceService } = useServices();
+  const { report, takeTrack, referenceTrack, outcome } = comparison;
   const practice = usePractice(reference.id, recordingId, report.keyOffsetSemitones);
   const referenceUrl = useObjectUrl(reference.audio);
   const referenceAudioRef = useRef<HTMLAudioElement>(null);
@@ -96,14 +93,8 @@ function ComparisonView({
   const [practising, setPractising] = useState<number | null>(null);
   const [showAll, setShowAll] = useState(false);
 
-  // The most recent older take already compared with this reference, for before-and-after scores.
-  const before = useMemo(
-    () =>
-      olderRecordingIds
-        .map((id) => comparisons.earlierReport(reference.id, id))
-        .find((r) => r !== undefined && r.segments.length === report.segments.length),
-    [comparisons, olderRecordingIds, reference.id, report.segments.length],
-  );
+  // The take recorded just before this one, if it was compared with the same reference.
+  const before = outcome?.previous?.sectionScores.length === report.segments.length ? outcome.previous : null;
 
   const stop = () => {
     playbackRef.current?.stop();
@@ -157,7 +148,7 @@ function ComparisonView({
       <audio ref={referenceAudioRef} src={referenceUrl} preload="auto" hidden />
 
       <div className="compare-summary">
-        <div className={`score score-${band(report.overallScore)}`}>
+        <div className={`score score-${band(report.overallScore)} ${outcome?.isPersonalBest ? 'is-best' : ''}`}>
           <span className="score-value">{report.overallScore}</span>
           <span className="score-label">match</span>
         </div>
@@ -167,6 +158,11 @@ function ComparisonView({
               ? 'Every section matched the reference.'
               : `${weak.length} of ${report.segments.length} sections need work.`}
           </p>
+          {outcome?.isPersonalBest && (
+            <p className="personal-best" role="status">
+              <span aria-hidden="true">✦</span> Your best take of this song so far! Previous best: {outcome.bestBefore}.
+            </p>
+          )}
           {before && (
             <p className="hint">
               Previous take: {before.overallScore} → now {report.overallScore}{' '}
@@ -212,7 +208,7 @@ function ComparisonView({
             const notes = describeSegment(segment);
             const sectionAttempts = practice.attempts.filter((a) => a.sectionIndex === segment.index);
             const progress = sectionProgress(sectionAttempts, rules);
-            const wasScore = before?.segments[segment.index].score;
+            const wasScore = before?.sectionScores[segment.index];
             const isPlaying = (what: Listen) => playing?.segment === segment.index && playing.listen === what;
             const button = (what: Listen, label: string) => (
               <button
@@ -302,10 +298,4 @@ function Change({ from, to }: { from: number; to: number }) {
       {change})
     </span>
   );
-}
-
-function scoreBand(score: number, passScore: number): 'good' | 'fair' | 'poor' {
-  if (score >= passScore) return 'good';
-  if (score >= passScore * 0.66) return 'fair';
-  return 'poor';
 }

@@ -6,7 +6,8 @@ export interface PracticeAttempt {
   /** Epoch milliseconds. */
   createdAt: number;
   result: SegmentResult;
-  audio: Blob;
+  /** Only for attempts made this session; saved attempts keep just their scores. */
+  audio?: Blob;
 }
 
 export interface PracticeRules {

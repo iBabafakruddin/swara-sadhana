@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useServices } from '@/app/ServicesProvider';
 import type { Reference, ReferenceId } from '@/domain/reference/Reference';
+import { JourneyPanel } from '@/features/progress/JourneyPanel';
 import { useRecorder } from '@/features/recorder/useRecorder';
 import { formatBytes, formatDuration } from '@/shared/format';
 import { useObjectUrl } from '@/shared/useObjectUrl';
@@ -83,6 +84,7 @@ interface ItemProps {
 function ReferenceItem({ reference, onRename, onDelete }: ItemProps) {
   const audioUrl = useObjectUrl(reference.audio);
   const [title, setTitle] = useState(reference.title);
+  const [showJourney, setShowJourney] = useState(false);
   useEffect(() => setTitle(reference.title), [reference.title]);
 
   const commitTitle = () => {
@@ -91,7 +93,7 @@ function ReferenceItem({ reference, onRename, onDelete }: ItemProps) {
   };
 
   const confirmDelete = () => {
-    if (window.confirm(`Delete the reference "${reference.title}"?`)) void onDelete(reference.id);
+    if (window.confirm(`Delete the reference "${reference.title}" and its progress history?`)) void onDelete(reference.id);
   };
 
   return (
@@ -109,11 +111,15 @@ function ReferenceItem({ reference, onRename, onDelete }: ItemProps) {
           {reference.source === 'upload' ? 'Uploaded' : 'Recorded'}
           {reference.durationMs > 0 && ` · ${formatDuration(reference.durationMs)}`} · {formatBytes(reference.sizeBytes)}
         </span>
+        <button type="button" className="button" aria-pressed={showJourney} onClick={() => setShowJourney((v) => !v)}>
+          {showJourney ? 'Hide progress' : 'Progress'}
+        </button>
         <button type="button" className="button button-danger" onClick={confirmDelete}>
           Delete
         </button>
       </div>
       <audio className="take-audio" src={audioUrl} controls preload="metadata" />
+      {showJourney && <JourneyPanel referenceId={reference.id} />}
     </div>
   );
 }

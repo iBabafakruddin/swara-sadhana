@@ -1,6 +1,8 @@
 import { HOUR_MS } from '@/config/appConfig';
+import { DronePanel } from '@/features/drone/DronePanel';
 import { RecordingList } from '@/features/library/RecordingList';
 import { useRecordings } from '@/features/library/useRecordings';
+import { StreakBadge } from '@/features/progress/StreakBadge';
 import { RecorderPanel } from '@/features/recorder/RecorderPanel';
 import { ReferencePanel } from '@/features/references/ReferencePanel';
 import { useReferences } from '@/features/references/useReferences';
@@ -25,9 +27,11 @@ export function App() {
           Record a take, listen back, check your pitch. Takes stay on this device for {retentionHours} hours, so
           save the ones you want to keep.
         </p>
+        <StreakBadge />
       </header>
       <main className="app-main">
         <RecorderPanel onCaptured={library.add} />
+        <DronePanel />
         <ReferencePanel library={references} />
         <RecordingList library={library} references={references.items} />
       </main>

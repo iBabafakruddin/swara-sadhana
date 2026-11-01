@@ -1,12 +1,15 @@
 import type { Reference, ReferenceId, ReferenceSource } from '@/domain/reference/Reference';
 import { defaultTitle } from './naming';
 import type { AudioInspector, CapturedAudio, Clock, IdGenerator, ReferenceRepository } from './ports';
+import type { ProgressService } from './ProgressService';
 
 export interface ReferenceServiceDeps {
   repository: ReferenceRepository;
   inspector: AudioInspector;
   clock: Clock;
   ids: IdGenerator;
+  /** Deleting a reference also deletes its score history. */
+  history?: Pick<ProgressService, 'forgetReference'>;
 }
 
 export interface ReferenceServiceOptions {
@@ -68,8 +71,9 @@ export class ReferenceService {
     await this.deps.repository.save({ ...reference, title: trimmed });
   }
 
-  remove(id: ReferenceId): Promise<void> {
-    return this.deps.repository.delete(id);
+  async remove(id: ReferenceId): Promise<void> {
+    await this.deps.repository.delete(id);
+    await this.deps.history?.forgetReference(id);
   }
 
   private async store(input: {

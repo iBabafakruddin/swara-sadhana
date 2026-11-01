@@ -1,14 +1,17 @@
 import { ComparisonService } from '@/application/ComparisonService';
-import type { AudioRecorderFactory, PitchAnalyzer, TonePlayer } from '@/application/ports';
+import type { AudioRecorderFactory, DronePlayer, PitchAnalyzer, TonePlayer } from '@/application/ports';
 import { PracticeService } from '@/application/PracticeService';
+import { ProgressService } from '@/application/ProgressService';
 import { RecordingService } from '@/application/RecordingService';
 import { ReferenceService } from '@/application/ReferenceService';
 import { appConfig, type AppConfig } from '@/config/appConfig';
 import { HtmlAudioInspector } from '@/infrastructure/audio/HtmlAudioInspector';
 import { MediaRecorderAudioRecorder } from '@/infrastructure/audio/MediaRecorderAudioRecorder';
 import { OscillatorTonePlayer } from '@/infrastructure/audio/OscillatorTonePlayer';
+import { TanpuraDrone } from '@/infrastructure/audio/TanpuraDrone';
 import { WebAudioPitchAnalyzer } from '@/infrastructure/audio/WebAudioPitchAnalyzer';
 import { BrowserFileExporter } from '@/infrastructure/export/BrowserFileExporter';
+import { IndexedDbProgressRepository } from '@/infrastructure/storage/IndexedDbProgressRepository';
 import { IndexedDbRecordingRepository } from '@/infrastructure/storage/IndexedDbRecordingRepository';
 import { IndexedDbReferenceRepository } from '@/infrastructure/storage/IndexedDbReferenceRepository';
 import { cryptoIdGenerator, systemClock } from '@/infrastructure/system';
@@ -19,7 +22,9 @@ export interface AppServices {
   references: ReferenceService;
   comparisons: ComparisonService;
   practice: PracticeService;
+  progress: ProgressService;
   tonePlayer: TonePlayer;
+  drone: DronePlayer;
   recorderSupported: boolean;
   createRecorder: AudioRecorderFactory;
   pitchAnalyzer: PitchAnalyzer;
@@ -32,6 +37,10 @@ export interface AppServices {
 export function createAppServices(config: AppConfig = appConfig): AppServices {
   const recordingRepository = new IndexedDbRecordingRepository(config.storage.databaseName);
   const referenceRepository = new IndexedDbReferenceRepository(config.storage.databaseName);
+  const progress = new ProgressService({
+    repository: new IndexedDbProgressRepository(config.storage.databaseName),
+    clock: systemClock,
+  });
 
   const recordings = new RecordingService(
     {
@@ -39,6 +48,7 @@ export function createAppServices(config: AppConfig = appConfig): AppServices {
       exporter: new BrowserFileExporter(),
       clock: systemClock,
       ids: cryptoIdGenerator,
+      activity: progress,
     },
     { retentionMs: config.retentionMs },
   );
@@ -49,6 +59,7 @@ export function createAppServices(config: AppConfig = appConfig): AppServices {
       inspector: new HtmlAudioInspector(),
       clock: systemClock,
       ids: cryptoIdGenerator,
+      history: progress,
     },
     { maxUploadBytes: config.references.maxUploadBytes },
   );
@@ -58,12 +69,13 @@ export function createAppServices(config: AppConfig = appConfig): AppServices {
       references: referenceRepository,
       recordings: recordingRepository,
       analyzer: new WebAudioPitchAnalyzer({ ...config.pitch, hopSize: config.comparison.hopSize }),
+      history: progress,
     },
     config.comparison,
   );
 
   const practice = new PracticeService(
-    { comparisons, clock: systemClock, ids: cryptoIdGenerator },
+    { comparisons, history: progress, clock: systemClock, ids: cryptoIdGenerator },
     { passScore: config.comparison.scoring.passScore, passesInARow: config.practice.passesInARow },
   );
 
@@ -73,7 +85,9 @@ export function createAppServices(config: AppConfig = appConfig): AppServices {
     references,
     comparisons,
     practice,
+    progress,
     tonePlayer: new OscillatorTonePlayer(),
+    drone: new TanpuraDrone(),
     recorderSupported: MediaRecorderAudioRecorder.isSupported(),
     createRecorder: () => new MediaRecorderAudioRecorder(config.pitch),
     pitchAnalyzer: new WebAudioPitchAnalyzer({ ...config.pitch }),

@@ -1,8 +1,12 @@
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export const RECORDINGS_STORE = 'recordings';
 export const REFERENCES_STORE = 'references';
+export const TAKE_SCORES_STORE = 'takeScores';
+export const PRACTICE_LOG_STORE = 'practiceLog';
+export const ACTIVE_DAYS_STORE = 'activeDays';
 export const EXPIRES_AT_INDEX = 'expiresAt';
+export const REFERENCE_ID_INDEX = 'referenceId';
 
 const connections = new Map<string, Promise<IDBDatabase>>();
 
@@ -12,14 +16,20 @@ export function openDatabase(name: string): Promise<IDBDatabase> {
   if (!connection) {
     connection = new Promise((resolve, reject) => {
       const request = indexedDB.open(name, DB_VERSION);
-      // Bump DB_VERSION and add a branch on event.oldVersion when the schema changes.
-      request.onupgradeneeded = (event) => {
+      // Bump DB_VERSION when adding a store. Creating whatever is missing (rather than branching on
+      // oldVersion) also repairs a database that was created empty, e.g. by a devtools session.
+      request.onupgradeneeded = () => {
         const db = request.result;
-        if (event.oldVersion < 1) {
-          const recordings = db.createObjectStore(RECORDINGS_STORE, { keyPath: 'id' });
-          recordings.createIndex(EXPIRES_AT_INDEX, 'expiresAt');
-        }
-        if (event.oldVersion < 2) db.createObjectStore(REFERENCES_STORE, { keyPath: 'id' });
+        const ensure = (store: string, keyPath: string, index?: [string, string]) => {
+          if (db.objectStoreNames.contains(store)) return;
+          const created = db.createObjectStore(store, { keyPath });
+          if (index) created.createIndex(...index);
+        };
+        ensure(RECORDINGS_STORE, 'id', [EXPIRES_AT_INDEX, 'expiresAt']);
+        ensure(REFERENCES_STORE, 'id');
+        ensure(TAKE_SCORES_STORE, 'id', [REFERENCE_ID_INDEX, 'referenceId']);
+        ensure(PRACTICE_LOG_STORE, 'id', [REFERENCE_ID_INDEX, 'referenceId']);
+        ensure(ACTIVE_DAYS_STORE, 'day');
       };
       request.onsuccess = () => {
         // Let a newer version of the app, open in another tab, upgrade the schema.

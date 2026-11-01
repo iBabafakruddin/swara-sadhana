@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { frequencyToNote, isNaturalNote } from './notes';
 import { summarizePitch } from './pitchSummary';
+import { findShruti, SHRUTIS } from './shruti';
 
 describe('frequencyToNote', () => {
   it.each([
@@ -37,5 +38,14 @@ describe('summarizePitch', () => {
       { timeSec: 0.3, frequencyHz: null },
     ]);
     expect(summary).toMatchObject({ mostSungNote: 'A4', lowestNote: 'A4', highestNote: 'C5', voicedRatio: 0.75 });
+  });
+});
+
+describe('shrutis', () => {
+  it('lists the twelve keys with their kattai numbers', () => {
+    expect(SHRUTIS).toHaveLength(12);
+    expect(findShruti('C#')).toMatchObject({ kattai: '1½' });
+    expect(findShruti('A')?.frequencyHz).toBeCloseTo(220, 5);
+    expect(findShruti('G')?.kattai).toBe('5');
   });
 });

@@ -27,7 +27,7 @@
 
 ## Project-specific notes
 
-**Swara Sadhana** (స్వర సాధన, "practice of the notes"): a client-only SPA for singing practice. It records takes, plays them back (with speed control), shows a pitch chart, compares takes with a reference vocal section by section, and lets the singer practise weak sections until they pass. Takes live in browser IndexedDB and are auto-deleted after 24h; references are kept until deleted. "Save" means downloading the file to the device. There is intentionally no backend, database, cache or auth yet; don't add them unless asked.
+**Swara Sadhana** (స్వర సాధన, "practice of the notes"): a client-only SPA for singing practice. It records takes, plays them back (with speed control), shows a pitch chart, compares takes with a reference vocal section by section, lets the singer practise weak sections until they pass, tracks progress per song over time, and plays a tanpura drone. Takes live in browser IndexedDB and are auto-deleted after 24h; references are kept until deleted, and score history (no audio) is kept until its reference is deleted. "Save" means downloading the file to the device. There is intentionally no backend, database, cache or auth yet; don't add them unless asked.
 
 Stack: React 18 + TypeScript (strict) + Vite 5, Vitest, ESLint 9 (flat config). Import alias `@/` → `src/`.
 
@@ -51,6 +51,7 @@ Gotchas:
 - Microphone access needs a secure context (localhost or HTTPS).
 - References must be vocals without accompaniment: YIN follows one voice. YouTube/streaming URLs are deliberately unsupported (terms of service, needs a backend).
 - Pitch detection runs in a Web Worker (`pitch.worker.ts`); decoding stays on the main thread because `OfflineAudioContext` isn't available in workers.
-- The IndexedDB schema lives in `infrastructure/storage/database.ts`. Bump `DB_VERSION` and add an `oldVersion` branch for schema changes.
+- The IndexedDB schema lives in `infrastructure/storage/database.ts`. Bump `DB_VERSION` and add an `ensure(...)` line for new stores; upgrades create whatever is missing.
 - Range playback (`shared/playRange.ts`) checks on both animation frames and `timeupdate`, because frames are throttled in background tabs. Practice recording uses timers for the same reason.
-- Practice attempts are scored with `compareSection`, which fixes the key to the full take's key offset so a line sung consistently flat isn't mistaken for a key change. Attempts live in memory only (`PracticeService`); before/after scores come from comparisons made earlier in the same session.
+- Practice attempts are scored with `compareSection`, which fixes the key to the full take's key offset so a line sung consistently flat isn't mistaken for a key change. Attempt scores are saved through `ProgressService`; attempt audio is kept in memory for the session only. Before/after and personal-best come from the saved `TakeScore` history.
+- `ProgressService.onChange` notifies the UI (streak, journey) after any history write; use it rather than polling when adding progress views.

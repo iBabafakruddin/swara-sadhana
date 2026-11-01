@@ -19,11 +19,10 @@ export function RecordingList({ library, references }: { library: RecordingLibra
         <p className="empty">No takes yet. Press record and sing.</p>
       ) : (
         <ul className="take-list">
-          {items.map((recording, index) => (
+          {items.map((recording) => (
             <li key={recording.id}>
               <RecordingCard
                 recording={recording}
-                olderRecordingIds={items.slice(index + 1).map((r) => r.id)}
                 references={references}
                 now={now}
                 onRename={library.rename}

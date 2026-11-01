@@ -10,25 +10,29 @@ import {
 import type { RecordingId } from '@/domain/recording/Recording';
 import type { ReferenceId } from '@/domain/reference/Reference';
 import type { PitchAnalyzer, RecordingRepository, ReferenceRepository } from './ports';
+import type { ComparisonOutcome, ProgressService } from './ProgressService';
 
 export interface ComparisonServiceDeps {
   references: ReferenceRepository;
   recordings: RecordingRepository;
   /** Should use a finer time step than the pitch view; timing feedback depends on it. */
   analyzer: PitchAnalyzer;
+  /** Saves each comparison to the song's history; optional so tests can leave it out. */
+  history?: Pick<ProgressService, 'recordComparison'>;
 }
 
 export interface Comparison {
   report: ComparisonReport;
   takeTrack: PitchTrack;
   referenceTrack: PitchTrack;
+  /** How this take stands against the song's history; null without a history. */
+  outcome: ComparisonOutcome | null;
 }
 
 /** Compares a take with a reference and reports which sections need practice. */
 export class ComparisonService {
   // References never change and takes only expire, so each one is analysed once per session.
   private readonly tracks = new Map<string, Promise<PitchTrack>>();
-  private readonly reports = new Map<string, ComparisonReport>();
 
   constructor(
     private readonly deps: ComparisonServiceDeps,
@@ -36,22 +40,15 @@ export class ComparisonService {
   ) {}
 
   async compare(referenceId: ReferenceId, recordingId: RecordingId): Promise<Comparison> {
+    const recording = await this.deps.recordings.findById(recordingId);
+    if (!recording) throw new Error('This take no longer exists. It may have expired.');
     const [referenceTrack, takeTrack] = await Promise.all([
       this.referenceTrack(referenceId),
-      this.track(`take:${recordingId}`, async () => {
-        const recording = await this.deps.recordings.findById(recordingId);
-        if (!recording) throw new Error('This take no longer exists. It may have expired.');
-        return recording.audio;
-      }),
+      this.track(`take:${recordingId}`, async () => recording.audio),
     ]);
     const report = compareTakes(referenceTrack, takeTrack, this.options);
-    this.reports.set(pairKey(referenceId, recordingId), report);
-    return { report, takeTrack, referenceTrack };
-  }
-
-  /** A comparison already made this session, without analysing anything new. */
-  earlierReport(referenceId: ReferenceId, recordingId: RecordingId): ComparisonReport | undefined {
-    return this.reports.get(pairKey(referenceId, recordingId));
+    const outcome = (await this.deps.history?.recordComparison({ referenceId, recording, report })) ?? null;
+    return { report, takeTrack, referenceTrack, outcome };
   }
 
   /** Scores a practice attempt at one section, in the singer's known key. */
@@ -87,8 +84,4 @@ export class ComparisonService {
     }
     return track;
   }
-}
-
-function pairKey(referenceId: ReferenceId, recordingId: RecordingId): string {
-  return `${referenceId}|${recordingId}`;
 }

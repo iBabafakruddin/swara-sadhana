@@ -42,3 +42,12 @@ export function describeKeyOffset(semitones: number): string | null {
       : `${size} semitone${size === 1 ? '' : 's'}`;
   return `You sang ${amount} ${direction} than the reference. That's fine: scores are measured in your key.`;
 }
+
+export type ScoreBand = 'good' | 'fair' | 'poor';
+
+/** Passing scores are good; within a third of the pass mark is fair; anything lower is poor. */
+export function scoreBand(score: number, passScore: number): ScoreBand {
+  if (score >= passScore) return 'good';
+  if (score >= passScore * 0.66) return 'fair';
+  return 'poor';
+}

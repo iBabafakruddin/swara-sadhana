@@ -4,27 +4,37 @@ import type { RecordingId } from '@/domain/recording/Recording';
 import type { ReferenceId } from '@/domain/reference/Reference';
 import type { ComparisonService } from './ComparisonService';
 import type { Clock, IdGenerator } from './ports';
+import type { ProgressService } from './ProgressService';
 
 export interface PracticeServiceDeps {
-  comparisons: ComparisonService;
+  comparisons: Pick<ComparisonService, 'scoreSection'>;
+  /** Keeps attempt scores across reloads; optional so tests can leave it out. */
+  history?: Pick<ProgressService, 'recordAttempt' | 'practiceLog'>;
   clock: Clock;
   ids: IdGenerator;
 }
 
 /**
- * Practice attempts at the weak sections of a take. Attempts are kept in memory for this
- * session only: they are short drills, and the full retake is what gets saved.
+ * Practice attempts at the weak sections of a take. Scores are saved to the history;
+ * the audio of an attempt is kept in memory only, for listening back during the session.
  */
 export class PracticeService {
-  private readonly attempts = new Map<string, PracticeAttempt[]>();
+  private readonly attempts = new Map<string, Promise<PracticeAttempt[]>>();
 
   constructor(
     private readonly deps: PracticeServiceDeps,
     readonly rules: PracticeRules,
   ) {}
 
-  attemptsFor(referenceId: ReferenceId, recordingId: RecordingId): PracticeAttempt[] {
-    return this.attempts.get(sessionKey(referenceId, recordingId)) ?? [];
+  /** Every attempt for this take and reference, oldest first. Reloaded ones have no audio. */
+  attemptsFor(referenceId: ReferenceId, recordingId: RecordingId): Promise<PracticeAttempt[]> {
+    const key = sessionKey(referenceId, recordingId);
+    let attempts = this.attempts.get(key);
+    if (!attempts) {
+      attempts = this.loadSaved(referenceId, recordingId);
+      this.attempts.set(key, attempts);
+    }
+    return attempts;
   }
 
   /** Scores an attempt at one section and returns every attempt for this take and reference. */
@@ -48,9 +58,22 @@ export class PracticeService {
       result: { ...result, index: input.section.index },
       audio: input.audio,
     };
-    const all = [...this.attemptsFor(input.referenceId, input.recordingId), attempt];
-    this.attempts.set(sessionKey(input.referenceId, input.recordingId), all);
+    const all = [...(await this.attemptsFor(input.referenceId, input.recordingId)), attempt];
+    this.attempts.set(sessionKey(input.referenceId, input.recordingId), Promise.resolve(all));
+    await this.deps.history?.recordAttempt({
+      id: attempt.id,
+      referenceId: input.referenceId,
+      recordingId: input.recordingId,
+      sectionIndex: attempt.sectionIndex,
+      createdAt: attempt.createdAt,
+      result: attempt.result,
+    });
     return all;
+  }
+
+  private async loadSaved(referenceId: ReferenceId, recordingId: RecordingId): Promise<PracticeAttempt[]> {
+    const log = (await this.deps.history?.practiceLog(referenceId, recordingId)) ?? [];
+    return log.map(({ id, sectionIndex, createdAt, result }) => ({ id, sectionIndex, createdAt, result }));
   }
 }
 

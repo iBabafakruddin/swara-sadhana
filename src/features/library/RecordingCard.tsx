@@ -12,8 +12,6 @@ const EXPIRY_WARNING_MS = 60 * 60 * 1000;
 
 interface Props {
   recording: Recording;
-  /** Older takes, newest first, for before-and-after comparison scores. */
-  olderRecordingIds: RecordingId[];
   references: Reference[];
   now: number;
   onRename(id: RecordingId, title: string): Promise<void>;
@@ -23,7 +21,7 @@ interface Props {
 
 type Panel = 'pitch' | 'compare' | null;
 
-export function RecordingCard({ recording, olderRecordingIds, references, now, onRename, onDelete, onExport }: Props) {
+export function RecordingCard({ recording, references, now, onRename, onDelete, onExport }: Props) {
   const audioUrl = useObjectUrl(recording.audio);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [title, setTitle] = useState(recording.title);
@@ -123,7 +121,6 @@ export function RecordingCard({ recording, olderRecordingIds, references, now, o
       {panel === 'compare' && (
         <ComparePanel
           recordingId={recording.id}
-          olderRecordingIds={olderRecordingIds}
           references={references}
           takeAudioRef={audioRef}
           durationSec={recording.durationMs / 1000}

@@ -2,12 +2,15 @@ import type { Recording, RecordingId } from '@/domain/recording/Recording';
 import { computeExpiresAt, isExpired } from '@/domain/recording/retention';
 import { buildFileName, defaultTitle } from './naming';
 import type { CapturedAudio, Clock, FileExporter, IdGenerator, RecordingRepository } from './ports';
+import type { ProgressService } from './ProgressService';
 
 export interface RecordingServiceDeps {
   repository: RecordingRepository;
   exporter: FileExporter;
   clock: Clock;
   ids: IdGenerator;
+  /** Counts a recorded take towards the daily practice streak. */
+  activity?: Pick<ProgressService, 'markActive'>;
 }
 
 export interface RecordingServiceOptions {
@@ -38,6 +41,7 @@ export class RecordingService {
       audio: input.blob,
     };
     await this.deps.repository.save(recording);
+    await this.deps.activity?.markActive(createdAt);
     return recording;
   }
 

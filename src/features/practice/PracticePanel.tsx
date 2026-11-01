@@ -4,8 +4,9 @@ import type { PlaybackHandle } from '@/application/ports';
 import type { PitchTrack } from '@/domain/analysis/pitchDetection';
 import type { SegmentResult } from '@/domain/comparison/compareTakes';
 import { describeSegment } from '@/domain/comparison/feedback';
-import { sectionProgress, type PracticeAttempt } from '@/domain/practice/practiceProgress';
+import { isPassingAttempt, sectionProgress, type PracticeAttempt } from '@/domain/practice/practiceProgress';
 import { PitchChart } from '@/features/analysis/PitchChart';
+import { formatDateTime } from '@/shared/format';
 import { playRange } from '@/shared/playRange';
 import { useObjectUrl } from '@/shared/useObjectUrl';
 import { useAttemptRecorder, type PlayAlong } from './useAttemptRecorder';
@@ -207,29 +208,44 @@ export function PracticePanel({
 }
 
 function AttemptRow({ attempt, number }: { attempt: PracticeAttempt; number: number }) {
-  const url = useObjectUrl(attempt.audio);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [playing, setPlaying] = useState(false);
   const { practice } = useServices();
   const notes = describeSegment(attempt.result);
-  const passed = attempt.result.score >= practice.rules.passScore && !attempt.result.issues.includes('missed');
-
-  const toggle = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (audio.paused) {
-      audio.currentTime = 0;
-      void audio.play();
-    } else {
-      audio.pause();
-    }
-  };
+  const passed = isPassingAttempt(attempt, practice.rules);
 
   return (
     <li className="attempt">
       <span className={`segment-score ${passed ? 'score-good' : 'score-poor'}`}>{attempt.result.score}</span>
       <span className="attempt-label">Attempt {number}</span>
       <span className="attempt-notes">{notes.length ? notes.join(' ') : 'Good match.'}</span>
+      {attempt.audio ? (
+        <AttemptPlayer audio={attempt.audio} />
+      ) : (
+        <span className="muted attempt-saved" title="Attempts from earlier sessions keep only their scores">
+          {formatDateTime(attempt.createdAt)}
+        </span>
+      )}
+    </li>
+  );
+}
+
+function AttemptPlayer({ audio }: { audio: Blob }) {
+  const url = useObjectUrl(audio);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const toggle = () => {
+    const element = audioRef.current;
+    if (!element) return;
+    if (element.paused) {
+      element.currentTime = 0;
+      void element.play();
+    } else {
+      element.pause();
+    }
+  };
+
+  return (
+    <>
       <button type="button" className="button" aria-pressed={playing} onClick={toggle}>
         {playing ? 'Stop' : 'Play'}
       </button>
@@ -242,6 +258,6 @@ function AttemptRow({ attempt, number }: { attempt: PracticeAttempt; number: num
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
       />
-    </li>
+    </>
   );
 }

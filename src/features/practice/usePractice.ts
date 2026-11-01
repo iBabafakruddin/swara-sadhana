@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useServices } from '@/app/ServicesProvider';
 import type { SegmentResult } from '@/domain/comparison/compareTakes';
 import type { PracticeAttempt } from '@/domain/practice/practiceProgress';
@@ -11,14 +11,26 @@ export interface PracticeState {
   addAttempt(section: SegmentResult, audio: Blob): Promise<void>;
 }
 
-/** Practice attempts for one take and reference; they survive closing and reopening the panel. */
+/** Practice attempts for one take and reference, including ones saved in earlier sessions. */
 export function usePractice(
   referenceId: ReferenceId,
   recordingId: RecordingId,
   keyOffsetSemitones: number,
 ): PracticeState {
   const { practice } = useServices();
-  const [attempts, setAttempts] = useState(() => practice.attemptsFor(referenceId, recordingId));
+  const [attempts, setAttempts] = useState<PracticeAttempt[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    // History is a nice-to-have here; practice still works if it can't be read.
+    practice.attemptsFor(referenceId, recordingId).then(
+      (saved) => !cancelled && setAttempts(saved),
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [practice, referenceId, recordingId]);
 
   const addAttempt = useCallback(
     async (section: SegmentResult, audio: Blob) => {

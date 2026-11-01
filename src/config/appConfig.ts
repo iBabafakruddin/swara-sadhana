@@ -65,6 +65,11 @@ export const appConfig = {
     graceSec: 1.5,
     speeds: [0.5, 0.75, 1],
   },
+  drone: {
+    /** C# (1½ kattai) is a common starting shruti; singers change it in the tanpura panel. */
+    defaultShruti: 'C#',
+    defaultVolume: 0.6,
+  },
 };
 
 export type AppConfig = typeof appConfig;

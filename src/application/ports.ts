@@ -5,6 +5,7 @@
 import type { PitchTrack } from '@/domain/analysis/pitchDetection';
 import type { TimeRange } from '@/domain/comparison/compareTakes';
 import type { Recording, RecordingId } from '@/domain/recording/Recording';
+import type { PracticeLogEntry, TakeScore } from '@/domain/progress/progress';
 import type { Reference, ReferenceId } from '@/domain/reference/Reference';
 
 export interface RecordingRepository {
@@ -21,6 +22,19 @@ export interface ReferenceRepository {
   findAll(): Promise<Reference[]>;
   findById(id: ReferenceId): Promise<Reference | undefined>;
   delete(id: ReferenceId): Promise<void>;
+}
+
+/** Scores kept long-term: no audio, so it is small and outlives the takes. */
+export interface ProgressRepository {
+  saveTakeScore(score: TakeScore): Promise<void>;
+  takeScoresFor(referenceId: ReferenceId): Promise<TakeScore[]>;
+  addPracticeLog(entry: PracticeLogEntry): Promise<void>;
+  practiceLogFor(referenceId: ReferenceId): Promise<PracticeLogEntry[]>;
+  /** Records that some practice happened on this local day ("YYYY-MM-DD"). */
+  markActiveDay(day: string): Promise<void>;
+  activeDays(): Promise<string[]>;
+  /** Removes every score and log entry for a reference. */
+  deleteForReference(referenceId: ReferenceId): Promise<void>;
 }
 
 export interface CapturedAudio {
@@ -63,6 +77,17 @@ export interface TonePlayer {
   playMelody(track: PitchTrack, range: TimeRange, rate: number): PlaybackHandle;
   /** `beats` evenly spaced clicks; done resolves on the last one. */
   countIn(beats: number, intervalSec: number): PlaybackHandle;
+}
+
+/** The tanpura's first string: Pa for most ragas, Ma or Ni for ragas without Pa. */
+export type DroneFirstString = 'pa' | 'ma' | 'ni';
+
+/** A continuous tanpura-style drone on the singer's Sa (shruti). */
+export interface DronePlayer {
+  start(tonicHz: number, firstString: DroneFirstString): void;
+  stop(): void;
+  /** 0..1; takes effect smoothly while playing. */
+  setVolume(volume: number): void;
 }
 
 export interface FileExporter {

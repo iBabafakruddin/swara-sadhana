@@ -4,7 +4,11 @@ A single-page web app for singing practice. Record a take, listen back (optional
 
 Add a **reference vocal** (upload a clean vocal file or record one, e.g. your teacher singing the line) and press **Compare** on a take. The app lines the take up with the reference, allows for a later start or a different key, scores each phrase, and lists the sections that need work with notes such as "about 40 cents flat" or "came in 0.5 s late". Each section can be replayed as reference, your version, or both back to back. References need to be vocals without background music; pitch detection follows one voice.
 
-Press **Practise** on a weak section to drill it: listen to the reference (slowed down to 0.5× or 0.75× without changing pitch, optionally looped) or to a **guide tone** playing the melody in your key, then **Sing it** after a count-in while a live pitch line shows you against the target. Each attempt is scored straight away. Two passing attempts in a row mark the section as learned; once every weak section is learned, record the full song again and the comparison shows before-and-after scores per section. Practice attempts are kept in memory for the current session only.
+Press **Practise** on a weak section to drill it: listen to the reference (slowed down to 0.5× or 0.75× without changing pitch, optionally looped) or to a **guide tone** playing the melody in your key, then **Sing it** after a count-in while a live pitch line shows you against the target. Each attempt is scored straight away. Two passing attempts in a row mark the section as learned; once every weak section is learned, record the full song again and the comparison shows before-and-after scores per section.
+
+**Progress over time.** Every comparison and practice attempt is scored into a history that outlives the 24-hour takes (scores only, no audio). Press **Progress** on a reference to see the song's journey: a score trend across takes, a section-by-take map showing which lines have come good, and practice totals. A new best take is celebrated, and the header keeps a daily *sadhana* streak with a seven-day calendar.
+
+**Tanpura.** A synthesised tanpura drone on your shruti (C to B, with kattai numbers), first string Pa, Ma or Ni, for finding Sa before you sing. Use headphones if it plays while recording.
 
 Takes are stored **only in your browser** and are deleted automatically after 24 hours, so practice doesn't eat storage. To keep a take, press **Save to device** to download the audio file.
 
@@ -38,12 +42,14 @@ Layered ("ports and adapters"), so storage, recording or analysis can be swapped
 ```
 src/
   domain/          Pure logic, no browser APIs: Recording and Reference models, retention rules, pitch detection (YIN),
-                   note maths, comparison (DTW alignment, phrase splitting, scoring, feedback text), practice progress
-  application/     Use cases (RecordingService, ReferenceService, ComparisonService, PracticeService) and their ports
+                   note maths, shrutis, comparison (DTW alignment, phrase splitting, scoring, feedback text),
+                   practice progress, score history and streaks
+  application/     Use cases (Recording, Reference, Comparison, Practice and Progress services) and their ports
   infrastructure/  Browser adapters: IndexedDB storage, MediaRecorder (+ live pitch), Web Worker pitch analysis,
-                   oscillator guide tones and count-in, file download
+                   oscillator guide tones and count-in, tanpura drone, file download
   app/             Composition root (container.ts) and React context that hands services to the UI
-  features/        UI by feature: recorder, library (list of takes), references, compare, practice, analysis (pitch chart)
+  features/        UI by feature: recorder, drone, library (list of takes), references, compare, practice, progress,
+                   analysis (pitch chart)
   shared/          Formatting, error messages, small React hooks
   config/          App settings
 ```
